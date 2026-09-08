@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>動作確認ページ</title>
+<style>
+  body { font-family: sans-serif; padding: 20px; background: #fafafa; }
+  button { font-size: 18px; padding: 14px 20px; border-radius: 10px; border: none; background: #54614A; color: white; width: 100%; margin-bottom: 20px; }
+  pre { white-space: pre-wrap; word-break: break-word; background: #fff; border: 1px solid #ddd; border-radius: 10px; padding: 16px; font-size: 14px; }
+  h2 { font-size: 18px; }
+</style>
+</head>
+<body>
+  <h2>Worker動作確認</h2>
+  <button id="testBtn">テスト送信する</button>
+  <pre id="result">ここに結果が表示されます</pre>
+
+  <script>
+    const ENDPOINT = "https://panipani-review.panipani-ikuchijima.workers.dev";
+    const resultEl = document.getElementById("result");
+    const btn = document.getElementById("testBtn");
+
+    btn.addEventListener("click", async () => {
+      resultEl.textContent = "送信中...";
+      try {
+        const res = await fetch(ENDPOINT, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ summary: "テスト送信です。動作確認用のダミー内容です。" }),
+        });
+        const text = await res.text();
+        resultEl.textContent = "ステータス: " + res.status + "\n\n" + text;
+      } catch (e) {
+        resultEl.textContent = "通信エラー: " + String(e);
+      }
+    });
+  </script>
+</body>
+</html>
