@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>panipani 口コミ作成</title>
+<style>
+  html, body { margin: 0; padding: 0; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<script type="text/babel">
+const { useState, useRef } = React;
+
+/* ============================================================
+   設定（あとで変更しやすいようにここにまとめています）
+   ============================================================ */
+
+// Googleマップの口コミ投稿ページURL（panipani生口島）
+const GOOGLE_MAP_REVIEW_URL = "https://g.page/r/CWy6suYmr9qzECE/review";
+
+// AIによる口コミ生成を代行してくれる窓口（Cloudflare Workers）のURL。
+const REVIEW_API_ENDPOINT = "https://panipani-review.panipani-ikuchijima.workers.dev";
+
+/* ============================================================
+   アンケート定義
+   ============================================================ */
+
+const QUESTIONS = [
+  {
+    id: "purpose",
+    title: "今回、panipaniに宿泊した目的は？",
+    type: "single",
+    other: true,
+    options: [
+      "観光",
+      "帰省",
+      "サイクリング",
+      "レモンマラソン",
+      "サイクリングしまなみ",
+      "ビジネス・仕事",
+      "イベント・大会",
+      "その他",
+    ],
+  },
+  {
+    id: "goodPoints",
+    title: "panipaniで特に良かったところは？",
+    subtitle: "いくつでも選べます",
+    type: "multi",
+    other: true,
+    options: [
+      "清潔で快適だった",
+      "ベッドが快適だった",
+      "ゆっくり過ごせた",
+      "落ち着いた雰囲気だった",
+      "無人チェックインが便利だった",
+      "無人チェックアウトが便利だった",
+      "自分のペースで過ごせた",
+      "プライベート感があった",
+      "共用スペースが使いやすかった",
+      "設備が充実していた",
+      "Wi-Fiが快適だった",
+      "立地が便利だった",
+      "料金がリーズナブルだった",
+      "瀬戸田観光に便利だった",
+      "生口島観光に便利だった",
+      "しまなみ海道へのアクセスが良かった",
+      "サイクリングの宿として便利だった",
+      "静かに過ごせた",
+      "居心地が良かった",
+      "その他",
+    ],
+  },
+  {
+    id: "impression",
+    title: "panipaniで印象に残ったこと・良かったことを教えてください",
+    type: "text",
+    optional: true,
+    placeholder: "印象に残ったことや、実際に感じたことを自由に入力してください",
+  },
+  {
+    id: "companion",
+    title: "誰と宿泊しましたか？",
+    type: "single",
+    other: true,
+    options: ["一人", "友人", "カップル・パートナー", "家族", "その他"],
+  },
+  {
+    id: "goodAspects",
+    title: "panipaniを利用して、どんなところが良かったと感じましたか？",
+    subtitle: "いくつでも選べます",
+    type: "multi",
+    other: true,
+    options: [
+      "快適だった",
+      "居心地が良かった",
+      "清潔だった",
+      "リラックスできた",
+      "ゆっくり過ごせた",
+      "自分のペースで過ごせた",
+      "利用しやすかった",
+      "分かりやすかった",
+      "便利だった",
+      "安心して利用できた",
+      "また利用したいと思った",
+      "旅行の拠点として便利だった",
+      "サイクリングの拠点として便利だった",
+      "その他",
+    ],
+  },
+  {
+    id: "oneWord",
+    title: "今回の宿泊をひとことで表すと？",
+    subtitle: "いくつでも選べます",
+    type: "multi",
+    other: true,
+    options: [
+      "快適",
+      "居心地がいい",
+      "落ち着く",
+      "清潔",
+      "便利",
+      "リーズナブル",
+      "過ごしやすい",
+      "使いやすい",
+      "自由に過ごせる",
+      "ゆっくりできる",
+      "安心",
+      "また泊まりたい",
+      "観光に便利",
+      "サイクリングに便利",
+      "生口島を楽しむ拠点にぴったり",
+      "瀬戸田を楽しむ拠点にぴったり",
+      "その他",
+    ],
+  },
+];
+
+const REVIEW_LABELS = {
+  natural: "自然な口コミ",
+  polite: "丁寧な口コミ",
+  friendly: "親しみやすい口コミ",
+};
+
+/* ============================================================
+   スタイル
+   ============================================================ */
+
+const GlobalStyle = () => (
+  <style>{`
+    @import url('https://fonts.googleapis.com/css2?family=Zen+Old+Mincho:wght@500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap');
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+    .pk-root {
+      font-family: 'Zen Kaku Gothic New', sans-serif;
+      background: #FBFAF6;
+      color: #33362E;
+      min-height: 100dvh;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    .pk-serif { font-family: 'Zen Old Mincho', serif; }
+
+    .pk-safe-bottom { padding-bottom: max(20px, env(safe-area-inset-bottom)); }
+    .pk-safe-top { padding-top: max(16px, env(safe-area-inset-top)); }
+
+    .pk-btn {
+      width: 100%;
+      border: none;
+      border-radius: 16px;
+      padding: 16px 20px;
+      font-size: 16px;
+      font-weight: 700;
+      font-family: 'Zen Kaku Gothic New', sans-serif;
+      cursor: pointer;
+      transition: transform 0.12s ease, opacity 0.12s ease;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    .pk-btn:active { transform: scale(0.98); }
+    .pk-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .pk-btn-primary { background: #54614A; color: #FBFAF6; }
+    .pk-btn-outline { background: transparent; color: #54614A; border: 1.5px solid #C9D0BE; }
+    .pk-btn-maps { background: #FFFFFF; color: #33362E; border: 1.5px solid #E4E0CF; }
+
+    .pk-chip {
+      width: 100%;
+      text-align: left;
+      border: 1.5px solid #E7E4D6;
+      background: #FFFFFF;
+      border-radius: 14px;
+      padding: 14px 16px;
+      font-size: 15px;
+      font-family: 'Zen Kaku Gothic New', sans-serif;
+      color: #33362E;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 52px;
+      transition: border-color 0.15s ease, background 0.15s ease;
+    }
+    .pk-chip.selected {
+      border-color: #7C8B6F;
+      background: #F1F4EC;
+    }
+    .pk-chip-mark {
+      flex-shrink: 0;
+      width: 20px;
+      height: 20px;
+      border-radius: 999px;
+      border: 1.5px solid #C9D0BE;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .pk-chip.selected .pk-chip-mark { background: #7C8B6F; border-color: #7C8B6F; }
+    .pk-chip-mark-square { border-radius: 6px; }
+
+    .pk-textarea, .pk-input {
+      width: 100%;
+      border: 1.5px solid #E7E4D6;
+      background: #FFFFFF;
+      border-radius: 14px;
+      padding: 14px 16px;
+      font-size: 16px;
+      font-family: 'Zen Kaku Gothic New', sans-serif;
+      color: #33362E;
+      resize: none;
+      outline: none;
+    }
+    .pk-textarea:focus, .pk-input:focus { border-color: #7C8B6F; }
+
+    .pk-progress-track {
+      width: 100%;
+      height: 4px;
+      background: #EDEAE0;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .pk-progress-fill {
+      height: 100%;
+      background: #7C8B6F;
+      border-radius: 999px;
+      transition: width 0.3s ease;
+    }
+
+    .pk-card {
+      background: #FFFFFF;
+      border: 1px solid #EFEBDD;
+      border-radius: 20px;
+      padding: 18px;
+    }
+
+    .pk-spinner {
+      width: 34px;
+      height: 34px;
+      border-radius: 999px;
+      border: 3px solid #E1DFCF;
+      border-top-color: #7C8B6F;
+      animation: pk-spin 0.9s linear infinite;
+    }
+    @keyframes pk-spin { to { transform: rotate(360deg); } }
+
+    .pk-fade { animation: pk-fade 0.28s ease; }
+    @keyframes pk-fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  `}</style>
+);
+
+/* ============================================================
+   小さな部品
+   ============================================================ */
+
+function TopWave() {
+  return (
+    <svg viewBox="0 0 375 90" width="100%" height="90" preserveAspectRatio="none" style={{ display: "block" }}>
+      <path
+        d="M0,40 C60,80 110,0 180,30 C250,60 300,10 375,45 L375,0 L0,0 Z"
+        fill="#F1F4EC"
+      />
+      <path
+        d="M0,55 C70,20 130,90 190,55 C260,15 310,70 375,40"
+        fill="none"
+        stroke="#B9C6AA"
+        strokeWidth="2"
+      />
+    </svg>
+  );
+}
+
+function BackHeader({ onBack, progressLabel, progressRatio }) {
+  return (
+    <div className="pk-safe-top" style={{ padding: "16px 20px 0" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "14px" }}>
+        <button
+          onClick={onBack}
+          aria-label="戻る"
+          style={{
+            background: "none",
+            border: "none",
+            padding: "6px",
+            marginLeft: "-6px",
+            cursor: "pointer",
+            color: "#54614A",
+            display: "flex",
+            alignItems: "center",
+          }}
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+            <path d="M15 5L8 12L15 19" stroke="#54614A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+        <div style={{ flex: 1 }}>
+          <div className="pk-progress-track">
+            <div className="pk-progress-fill" style={{ width: `${progressRatio * 100}%` }} />
+          </div>
+        </div>
+        <div style={{ fontSize: "13px", color: "#7C8B6F", fontWeight: 700, minWidth: "34px", textAlign: "right" }}>
+          {progressLabel}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   アンケートの回答編集
+   ============================================================ */
+
+function useAnswers() {
+  const initial = {};
+  QUESTIONS.forEach((q) => {
+    if (q.type === "single") initial[q.id] = { selected: "", otherText: "" };
+    else if (q.type === "multi") initial[q.id] = { selected: [], otherText: "" };
+    else initial[q.id] = "";
+  });
+  return useState(initial);
+}
+
+function isAnswerValid(question, value) {
+  if (question.type === "text") return true; // 任意
+  if (question.type === "single") {
+    if (!value.selected) return false;
+    if (value.selected === "その他") return value.otherText.trim().length > 0;
+    return true;
+  }
+  if (question.type === "multi") {
+    if (value.selected.length === 0) return false;
+    if (value.selected.includes("その他")) return value.otherText.trim().length > 0;
+    return true;
+  }
+  return true;
+}
+
+function QuestionCard({ question, value, onChange }) {
+  if (question.type === "text") {
+    return (
+      <textarea
+        className="pk-textarea"
+        rows={5}
+        placeholder={question.placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    );
+  }
+
+  const toggleSingle = (opt) => {
+    onChange({ selected: opt, otherText: opt === "その他" ? value.otherText : "" });
+  };
+
+  const toggleMulti = (opt) => {
+    const has = value.selected.includes(opt);
+    const nextSelected = has
+      ? value.selected.filter((o) => o !== opt)
+      : [...value.selected, opt];
+    onChange({
+      selected: nextSelected,
+      otherText: nextSelected.includes("その他") ? value.otherText : "",
+    });
+  };
+
+  const isSelected = (opt) =>
+    question.type === "single" ? value.selected === opt : value.selected.includes(opt);
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+      {question.options.map((opt) => (
+        <button
+          key={opt}
+          type="button"
+          className={`pk-chip${isSelected(opt) ? " selected" : ""}`}
+          onClick={() => (question.type === "single" ? toggleSingle(opt) : toggleMulti(opt))}
+        >
+          <span
+            className={`pk-chip-mark${question.type === "multi" ? " pk-chip-mark-square" : ""}`}
+          >
+            {isSelected(opt) && (
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                <path d="M5 13l4 4L19 7" stroke="#FFFFFF" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            )}
+          </span>
+          {opt}
+        </button>
+      ))}
+      {isSelected("その他") && (
+        <input
+          className="pk-input"
+          placeholder="内容を入力してください"
+          value={value.otherText}
+          onChange={(e) => onChange({ ...value, otherText: e.target.value })}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ============================================================
+   AI口コミ生成
+   ============================================================ */
+
+function buildAnswerSummary(answers) {
+  const describe = (q) => {
+    const v = answers[q.id];
+    if (q.type === "text") return v.trim() ? v.trim() : "（特になし）";
+    if (q.type === "single") {
+      if (!v.selected) return "（未回答）";
+      return v.selected === "その他" ? v.otherText.trim() : v.selected;
+    }
+    if (q.type === "multi") {
+      const items = v.selected.map((s) => (s === "その他" ? v.otherText.trim() : s)).filter(Boolean);
+      return items.length ? items.join("、") : "（未回答）";
+    }
+    return "";
+  };
+  return QUESTIONS.map((q) => `・${q.title}\n  → ${describe(q)}`).join("\n");
+}
+
+async function generateReviewsFromAnswers(answers) {
+  const summary = buildAnswerSummary(answers);
+
+  const response = await fetch(REVIEW_API_ENDPOINT, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ summary }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`API error: ${response.status}`);
+  }
+
+  const parsed = await response.json();
+
+  if (!parsed.natural || !parsed.polite || !parsed.friendly) {
+    throw new Error("生成結果の形式が不正です");
+  }
+  return parsed;
+}
+
+/* ============================================================
+   画面: トップ
+   ============================================================ */
+
+function TopScreen({ onStart }) {
+  return (
+    <div className="pk-fade" style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+      <TopWave />
+      <div
+        className="pk-safe-bottom"
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          padding: "0 28px",
+          gap: "18px",
+        }}
+      >
+        <div style={{ fontSize: "14px", color: "#7C8B6F", fontWeight: 700, letterSpacing: "0.02em" }}>
+          ＼最短30秒／
+        </div>
+        <div>
+          <div className="pk-serif" style={{ fontSize: "28px", fontWeight: 700, lineHeight: 1.5, color: "#33362E" }}>
+            ゲストハウスpanipaniでの
+            <br />
+            ご滞在はいかがでしたか？
+          </div>
+        </div>
+        <p style={{ fontSize: "15px", lineHeight: 1.9, color: "#5B5E52", margin: 0 }}>
+          簡単なアンケートに答えるだけで、選択した内容をもとにAIが口コミを作成します。
+        </p>
+        <div style={{ marginTop: "8px" }}>
+          <button className="pk-btn pk-btn-primary" onClick={onStart}>
+            アンケートに回答する
+          </button>
+        </div>
+        <p style={{ fontSize: "12px", color: "#9A9A8C", margin: 0, lineHeight: 1.7 }}>
+          選択式が中心なので、最短30秒ほどで完了します。内容はいつでも編集・確認してから投稿できます。
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   画面: アンケート
+   ============================================================ */
+
+function SurveyScreen({ answers, setAnswers, index, setIndex, onBackToTop, onGenerate }) {
+  const question = QUESTIONS[index];
+  const value = answers[question.id];
+  const valid = isAnswerValid(question, value);
+  const isLast = index === QUESTIONS.length - 1;
+
+  const handleChange = (next) => {
+    setAnswers((prev) => ({ ...prev, [question.id]: next }));
+  };
+
+  const handleNext = () => {
+    if (!valid) return;
+    if (isLast) onGenerate();
+    else setIndex(index + 1);
+  };
+
+  const handleBack = () => {
+    if (index === 0) onBackToTop();
+    else setIndex(index - 1);
+  };
+
+  return (
+    <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+      <BackHeader
+        onBack={handleBack}
+        progressLabel={`${index + 1} / ${QUESTIONS.length}`}
+        progressRatio={(index + 1) / QUESTIONS.length}
+      />
+      <div key={question.id} className="pk-fade" style={{ flex: 1, padding: "20px 20px 0", display: "flex", flexDirection: "column" }}>
+        <h2 className="pk-serif" style={{ fontSize: "20px", fontWeight: 700, lineHeight: 1.6, margin: "4px 0 4px", color: "#33362E" }}>
+          {question.title}
+        </h2>
+        {question.subtitle && (
+          <p style={{ fontSize: "13px", color: "#8C9082", margin: "0 0 16px" }}>{question.subtitle}</p>
+        )}
+        {!question.subtitle && <div style={{ height: "12px" }} />}
+        <div style={{ flex: 1, overflowY: "auto", paddingBottom: "16px" }}>
+          <QuestionCard question={question} value={value} onChange={handleChange} />
+        </div>
+      </div>
+      <div className="pk-safe-bottom" style={{ padding: "12px 20px 20px" }}>
+        <button className="pk-btn pk-btn-primary" disabled={!valid} onClick={handleNext}>
+          {isLast ? "口コミを作成する" : "次へ"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   画面: 生成中
+   ============================================================ */
+
+function GeneratingScreen() {
+  return (
+    <div className="pk-fade" style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "20px", padding: "0 32px" }}>
+      <div className="pk-spinner" />
+      <p style={{ fontSize: "15px", color: "#5B5E52", textAlign: "center", lineHeight: 1.8, margin: 0 }}>
+        あなたの回答から
+        <br />
+        口コミを作成しています…
+      </p>
+    </div>
+  );
+}
+
+/* ============================================================
+   画面: エラー
+   ============================================================ */
+
+function ErrorScreen({ onRetry, onBackToTop }) {
+  return (
+    <div className="pk-fade" style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "16px", padding: "0 32px", textAlign: "center" }}>
+      <p style={{ fontSize: "15px", color: "#5B5E52", lineHeight: 1.8, margin: 0 }}>
+        口コミの作成に失敗しました。
+        <br />
+        お手数ですが、もう一度お試しください。
+      </p>
+      <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: "10px" }}>
+        <button className="pk-btn pk-btn-primary" onClick={onRetry}>もう一度作成する</button>
+        <button className="pk-btn pk-btn-outline" onClick={onBackToTop}>はじめに戻る</button>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   画面: 結果
+   ============================================================ */
+
+function ReviewCard({ reviewKey, text, onTextChange }) {
+  const [copied, setCopied] = useState(false);
+  const timerRef = useRef(null);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (e) {
+      // フォールバック（クリップボードAPIが使えない場合）
+    }
+    setCopied(true);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="pk-card">
+      <div style={{ fontSize: "13px", fontWeight: 700, color: "#7C8B6F", marginBottom: "10px" }}>
+        【{REVIEW_LABELS[reviewKey]}】
+      </div>
+      <textarea
+        className="pk-textarea"
+        rows={6}
+        value={text}
+        onChange={(e) => onTextChange(e.target.value)}
+        style={{ marginBottom: "12px", background: "#FCFBF7" }}
+      />
+      <button className="pk-btn pk-btn-outline" onClick={handleCopy} style={{ fontSize: "14px" }}>
+        {copied ? "コピーしました！" : "コピーする"}
+      </button>
+    </div>
+  );
+}
+
+function ResultScreen({ reviews, setReviews, onRestart }) {
+  const handleChange = (key, value) => {
+    setReviews((prev) => ({ ...prev, [key]: value }));
+  };
+
+  return (
+    <div className="pk-fade" style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+      <div style={{ padding: "20px 20px 4px" }}>
+        <h2 className="pk-serif" style={{ fontSize: "20px", fontWeight: 700, margin: "0 0 6px", color: "#33362E" }}>
+          口コミが完成しました
+        </h2>
+        <p style={{ fontSize: "14px", color: "#5B5E52", lineHeight: 1.7, margin: 0 }}>
+          気に入った文章をコピーして、Googleマップに投稿できます。内容は自由に編集していただけます。
+        </p>
+      </div>
+      <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px", display: "flex", flexDirection: "column", gap: "14px" }}>
+        {["natural", "polite", "friendly"].map((key) => (
+          <ReviewCard
+            key={key}
+            reviewKey={key}
+            text={reviews[key]}
+            onTextChange={(v) => handleChange(key, v)}
+          />
+        ))}
+        <button
+          onClick={onRestart}
+          style={{ background: "none", border: "none", color: "#9A9A8C", fontSize: "13px", padding: "6px 0", cursor: "pointer" }}
+        >
+          もう一度アンケートに答える
+        </button>
+      </div>
+      <div className="pk-safe-bottom" style={{ padding: "10px 20px 20px" }}>
+        <a
+          href={GOOGLE_MAP_REVIEW_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ textDecoration: "none" }}
+        >
+          <button className="pk-btn pk-btn-maps">Googleマップで口コミを書く</button>
+        </a>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   ルート
+   ============================================================ */
+
+function PanipaniReviewApp() {
+  const [screen, setScreen] = useState("top"); // top | survey | generating | error | result
+  const [index, setIndex] = useState(0);
+  const [answers, setAnswers] = useAnswers();
+  const [reviews, setReviews] = useState({ natural: "", polite: "", friendly: "" });
+
+  const runGeneration = async () => {
+    setScreen("generating");
+    try {
+      const result = await generateReviewsFromAnswers(answers);
+      setReviews(result);
+      setScreen("result");
+    } catch (e) {
+      setScreen("error");
+    }
+  };
+
+  const restart = () => {
+    setIndex(0);
+    setScreen("survey");
+  };
+
+  return (
+    <div className="pk-root">
+      <GlobalStyle />
+      <div style={{ maxWidth: "480px", margin: "0 auto", width: "100%", flex: 1, display: "flex", flexDirection: "column" }}>
+        {screen === "top" && <TopScreen onStart={() => setScreen("survey")} />}
+        {screen === "survey" && (
+          <SurveyScreen
+            answers={answers}
+            setAnswers={setAnswers}
+            index={index}
+            setIndex={setIndex}
+            onBackToTop={() => setScreen("top")}
+            onGenerate={runGeneration}
+          />
+        )}
+        {screen === "generating" && <GeneratingScreen />}
+        {screen === "error" && <ErrorScreen onRetry={runGeneration} onBackToTop={() => setScreen("top")} />}
+        {screen === "result" && (
+          <ResultScreen reviews={reviews} setReviews={setReviews} onRestart={restart} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<PanipaniReviewApp />);
+</script>
+</body>
+</html>
