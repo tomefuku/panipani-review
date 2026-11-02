@@ -99,10 +99,120 @@ const QUESTIONS = [
 ];
 
 const REVIEW_LABELS = {
-  natural: "自然な口コミ",
-  polite: "丁寧な口コミ",
-  friendly: "親しみやすい口コミ",
+  ja: { natural: "自然な口コミ", polite: "丁寧な口コミ", friendly: "親しみやすい口コミ" },
+  en: { natural: "Casual review", polite: "Polite review", friendly: "Friendly review" },
 };
+
+/* ============================================================
+   言語（日本語 / English）
+   回答の「中身」は日本語のまま保持し、画面表示だけ英語に切り替えます
+   ============================================================ */
+
+const LangContext = React.createContext("ja");
+const useLang = () => React.useContext(LangContext);
+
+const UI = {
+  ja: {
+    langButton: "English",
+    topBadge: "＼最短30秒／",
+    topTitle: ["ゲストハウスpanipaniでの", "ご滞在はいかがでしたか？"],
+    topDesc: "簡単なアンケートに答えるだけで、選択した内容をもとにAIが口コミを作成します。",
+    topStart: "アンケートに回答する",
+    topNote: "選択式が中心なので、最短30秒ほどで完了します。内容はいつでも編集・確認してから投稿できます。",
+    back: "戻る",
+    next: "次へ",
+    create: "口コミを作成する",
+    otherPlaceholder: "内容を入力してください",
+    generating: ["あなたの回答から", "口コミを作成しています…"],
+    error: ["口コミの作成に失敗しました。", "お手数ですが、もう一度お試しください。"],
+    retry: "もう一度作成する",
+    toTop: "はじめに戻る",
+    resultTitle: "口コミが完成しました",
+    resultDesc: "気に入った文章をコピーして、Googleマップに投稿できます。内容は自由に編集していただけます。",
+    copy: "コピーする",
+    copied: "コピーしました！",
+    again: "もう一度アンケートに答える",
+    maps: "Googleマップで口コミを書く",
+  },
+  en: {
+    langButton: "日本語",
+    topBadge: "About 30 seconds",
+    topTitle: ["How was your stay at", "Guesthouse panipani?"],
+    topDesc: "Answer a few quick questions and AI will draft a review based on your choices.",
+    topStart: "Start the survey",
+    topNote: "Mostly multiple choice, so it takes about 30 seconds. You can read and edit the text before posting.",
+    back: "Back",
+    next: "Next",
+    create: "Create my review",
+    otherPlaceholder: "Please type here",
+    generating: ["Writing your review", "from your answers…"],
+    error: ["Sorry, we couldn't create the review.", "Please try again."],
+    retry: "Try again",
+    toTop: "Back to start",
+    resultTitle: "Your reviews are ready",
+    resultDesc: "Copy the one you like and post it on Google Maps. You can edit the text freely.",
+    copy: "Copy",
+    copied: "Copied!",
+    again: "Answer the survey again",
+    maps: "Write a review on Google Maps",
+  },
+};
+
+const Q_EN = {
+  purpose: {
+    title: "What was the purpose of your stay at panipani?",
+    options: { "観光": "Sightseeing", "帰省": "Visiting my hometown", "釣り": "Fishing", "ビジネス": "Business", "その他": "Other" },
+  },
+  goodPoints: {
+    title: "What did you like most about panipani?",
+    subtitle: "Select all that apply",
+    options: {
+      "清潔で快適だった": "Clean and comfortable",
+      "ゆっくり過ごせた": "I could relax",
+      "無人チェックインが便利だった": "Self check-in was convenient",
+      "料金がリーズナブルだった": "Good value for the price",
+      "生口島・瀬戸田観光に便利だった": "Convenient for sightseeing in Ikuchijima and Setoda",
+      "しまなみ海道へのアクセスが良かった": "Easy access to the Shimanami Kaido",
+      "居心地が良かった": "Cozy and comfortable",
+      "旅に丁度よかった": "Just right for a trip",
+      "その他": "Other",
+    },
+  },
+  impression: {
+    title: "Tell us what left an impression on you, or what you liked about panipani",
+    placeholder: "Write freely about what you noticed or felt (optional)",
+  },
+  companion: {
+    title: "Who did you stay with?",
+    options: { "一人": "Alone", "友人": "Friends", "カップル・パートナー": "Partner", "家族": "Family", "その他": "Other" },
+  },
+  oneWord: {
+    title: "How would you describe your stay in a word?",
+    subtitle: "Select all that apply",
+    options: {
+      "快適": "Comfortable",
+      "居心地がいい": "Cozy",
+      "落ち着く": "Calm",
+      "清潔": "Clean",
+      "便利": "Convenient",
+      "リーズナブル": "Affordable",
+      "過ごしやすい": "Easy to stay in",
+      "使いやすい": "Easy to use",
+      "自由に過ごせる": "Free to do as I like",
+      "ゆっくりできる": "Relaxing",
+      "また泊まりたい": "I'd stay again",
+      "観光に便利": "Great for sightseeing",
+      "サイクリングに便利": "Great for cycling",
+      "生口島・瀬戸田を楽しむ拠点にぴったり": "A perfect base for enjoying Ikuchijima and Setoda",
+      "その他": "Other",
+    },
+  },
+};
+
+const qTitle = (q, lang) => (lang === "en" && Q_EN[q.id] ? Q_EN[q.id].title : q.title);
+const qSubtitle = (q, lang) => (lang === "en" && Q_EN[q.id] ? Q_EN[q.id].subtitle : q.subtitle);
+const qPlaceholder = (q, lang) => (lang === "en" && Q_EN[q.id] ? Q_EN[q.id].placeholder : q.placeholder);
+const optLabel = (q, opt, lang) => (lang === "en" && Q_EN[q.id] && Q_EN[q.id].options ? Q_EN[q.id].options[opt] || opt : opt);
 
 /* ============================================================
    スタイル
@@ -257,12 +367,13 @@ function TopWave() {
 }
 
 function BackHeader({ onBack, progressLabel, progressRatio }) {
+  const lang = useLang();
   return (
-    <div className="pk-safe-top" style={{ padding: "16px 20px 0" }}>
+    <div style={{ padding: "8px 20px 0" }}>
       <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "14px" }}>
         <button
           onClick={onBack}
-          aria-label="戻る"
+          aria-label={UI[lang].back}
           style={{
             background: "none",
             border: "none",
@@ -321,12 +432,13 @@ function isAnswerValid(question, value) {
 }
 
 function QuestionCard({ question, value, onChange }) {
+  const lang = useLang();
   if (question.type === "text") {
     return (
       <textarea
         className="pk-textarea"
         rows={5}
-        placeholder={question.placeholder}
+        placeholder={qPlaceholder(question, lang)}
         value={value}
         onChange={(e) => onChange(e.target.value)}
       />
@@ -369,13 +481,13 @@ function QuestionCard({ question, value, onChange }) {
               </svg>
             )}
           </span>
-          {opt}
+          {optLabel(question, opt, lang)}
         </button>
       ))}
       {isSelected("その他") && (
         <input
           className="pk-input"
-          placeholder="内容を入力してください"
+          placeholder={UI[lang].otherPlaceholder}
           value={value.otherText}
           onChange={(e) => onChange({ ...value, otherText: e.target.value })}
         />
@@ -405,13 +517,13 @@ function buildAnswerSummary(answers) {
   return QUESTIONS.map((q) => `・${q.title}\n  → ${describe(q)}`).join("\n");
 }
 
-async function generateReviewsFromAnswers(answers) {
+async function generateReviewsFromAnswers(answers, lang) {
   const summary = buildAnswerSummary(answers);
 
   const response = await fetch(REVIEW_API_ENDPOINT, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ summary }),
+    body: JSON.stringify({ summary, lang }),
   });
 
   if (!response.ok) {
@@ -431,6 +543,8 @@ async function generateReviewsFromAnswers(answers) {
    ============================================================ */
 
 function TopScreen({ onStart }) {
+  const lang = useLang();
+  const t = UI[lang];
   return (
     <div className="pk-fade" style={{ flex: 1, display: "flex", flexDirection: "column" }}>
       <TopWave />
@@ -446,25 +560,25 @@ function TopScreen({ onStart }) {
         }}
       >
         <div style={{ fontSize: "14px", color: "#7C8B6F", fontWeight: 700, letterSpacing: "0.02em" }}>
-          ＼最短30秒／
+          {t.topBadge}
         </div>
         <div>
           <div className="pk-serif" style={{ fontSize: "28px", fontWeight: 700, lineHeight: 1.5, color: "#33362E" }}>
-            ゲストハウスpanipaniでの
+            {t.topTitle[0]}
             <br />
-            ご滞在はいかがでしたか？
+            {t.topTitle[1]}
           </div>
         </div>
         <p style={{ fontSize: "15px", lineHeight: 1.9, color: "#5B5E52", margin: 0 }}>
-          簡単なアンケートに答えるだけで、選択した内容をもとにAIが口コミを作成します。
+          {t.topDesc}
         </p>
         <div style={{ marginTop: "8px" }}>
           <button className="pk-btn pk-btn-primary" onClick={onStart}>
-            アンケートに回答する
+            {t.topStart}
           </button>
         </div>
         <p style={{ fontSize: "12px", color: "#9A9A8C", margin: 0, lineHeight: 1.7 }}>
-          選択式が中心なので、最短30秒ほどで完了します。内容はいつでも編集・確認してから投稿できます。
+          {t.topNote}
         </p>
       </div>
     </div>
@@ -476,6 +590,8 @@ function TopScreen({ onStart }) {
    ============================================================ */
 
 function SurveyScreen({ answers, setAnswers, index, setIndex, onBackToTop, onGenerate }) {
+  const lang = useLang();
+  const t = UI[lang];
   const question = QUESTIONS[index];
   const value = answers[question.id];
   const valid = isAnswerValid(question, value);
@@ -505,19 +621,19 @@ function SurveyScreen({ answers, setAnswers, index, setIndex, onBackToTop, onGen
       />
       <div key={question.id} className="pk-fade" style={{ flex: 1, padding: "20px 20px 0", display: "flex", flexDirection: "column" }}>
         <h2 className="pk-serif" style={{ fontSize: "20px", fontWeight: 700, lineHeight: 1.6, margin: "4px 0 4px", color: "#33362E" }}>
-          {question.title}
+          {qTitle(question, lang)}
         </h2>
-        {question.subtitle && (
-          <p style={{ fontSize: "13px", color: "#8C9082", margin: "0 0 16px" }}>{question.subtitle}</p>
+        {qSubtitle(question, lang) && (
+          <p style={{ fontSize: "13px", color: "#8C9082", margin: "0 0 16px" }}>{qSubtitle(question, lang)}</p>
         )}
-        {!question.subtitle && <div style={{ height: "12px" }} />}
+        {!qSubtitle(question, lang) && <div style={{ height: "12px" }} />}
         <div style={{ flex: 1, overflowY: "auto", paddingBottom: "16px" }}>
           <QuestionCard question={question} value={value} onChange={handleChange} />
         </div>
       </div>
       <div className="pk-safe-bottom" style={{ padding: "12px 20px 20px" }}>
         <button className="pk-btn pk-btn-primary" disabled={!valid} onClick={handleNext}>
-          {isLast ? "口コミを作成する" : "次へ"}
+          {isLast ? t.create : t.next}
         </button>
       </div>
     </div>
@@ -529,13 +645,14 @@ function SurveyScreen({ answers, setAnswers, index, setIndex, onBackToTop, onGen
    ============================================================ */
 
 function GeneratingScreen() {
+  const t = UI[useLang()];
   return (
     <div className="pk-fade" style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "20px", padding: "0 32px" }}>
       <div className="pk-spinner" />
       <p style={{ fontSize: "15px", color: "#5B5E52", textAlign: "center", lineHeight: 1.8, margin: 0 }}>
-        あなたの回答から
+        {t.generating[0]}
         <br />
-        口コミを作成しています…
+        {t.generating[1]}
       </p>
     </div>
   );
@@ -546,16 +663,17 @@ function GeneratingScreen() {
    ============================================================ */
 
 function ErrorScreen({ onRetry, onBackToTop }) {
+  const t = UI[useLang()];
   return (
     <div className="pk-fade" style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "16px", padding: "0 32px", textAlign: "center" }}>
       <p style={{ fontSize: "15px", color: "#5B5E52", lineHeight: 1.8, margin: 0 }}>
-        口コミの作成に失敗しました。
+        {t.error[0]}
         <br />
-        お手数ですが、もう一度お試しください。
+        {t.error[1]}
       </p>
       <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: "10px" }}>
-        <button className="pk-btn pk-btn-primary" onClick={onRetry}>もう一度作成する</button>
-        <button className="pk-btn pk-btn-outline" onClick={onBackToTop}>はじめに戻る</button>
+        <button className="pk-btn pk-btn-primary" onClick={onRetry}>{t.retry}</button>
+        <button className="pk-btn pk-btn-outline" onClick={onBackToTop}>{t.toTop}</button>
       </div>
     </div>
   );
@@ -566,6 +684,8 @@ function ErrorScreen({ onRetry, onBackToTop }) {
    ============================================================ */
 
 function ReviewCard({ reviewKey, text, onTextChange }) {
+  const lang = useLang();
+  const t = UI[lang];
   const [copied, setCopied] = useState(false);
   const timerRef = useRef(null);
 
@@ -583,7 +703,7 @@ function ReviewCard({ reviewKey, text, onTextChange }) {
   return (
     <div className="pk-card">
       <div style={{ fontSize: "13px", fontWeight: 700, color: "#7C8B6F", marginBottom: "10px" }}>
-        【{REVIEW_LABELS[reviewKey]}】
+        【{REVIEW_LABELS[lang][reviewKey]}】
       </div>
       <textarea
         className="pk-textarea"
@@ -593,13 +713,14 @@ function ReviewCard({ reviewKey, text, onTextChange }) {
         style={{ marginBottom: "12px", background: "#FCFBF7" }}
       />
       <button className="pk-btn pk-btn-outline" onClick={handleCopy} style={{ fontSize: "14px" }}>
-        {copied ? "コピーしました！" : "コピーする"}
+        {copied ? t.copied : t.copy}
       </button>
     </div>
   );
 }
 
 function ResultScreen({ reviews, setReviews, onRestart }) {
+  const t = UI[useLang()];
   const handleChange = (key, value) => {
     setReviews((prev) => ({ ...prev, [key]: value }));
   };
@@ -608,10 +729,10 @@ function ResultScreen({ reviews, setReviews, onRestart }) {
     <div className="pk-fade" style={{ flex: 1, display: "flex", flexDirection: "column" }}>
       <div style={{ padding: "20px 20px 4px" }}>
         <h2 className="pk-serif" style={{ fontSize: "20px", fontWeight: 700, margin: "0 0 6px", color: "#33362E" }}>
-          口コミが完成しました
+          {t.resultTitle}
         </h2>
         <p style={{ fontSize: "14px", color: "#5B5E52", lineHeight: 1.7, margin: 0 }}>
-          気に入った文章をコピーして、Googleマップに投稿できます。内容は自由に編集していただけます。
+          {t.resultDesc}
         </p>
       </div>
       <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px", display: "flex", flexDirection: "column", gap: "14px" }}>
@@ -627,7 +748,7 @@ function ResultScreen({ reviews, setReviews, onRestart }) {
           onClick={onRestart}
           style={{ background: "none", border: "none", color: "#9A9A8C", fontSize: "13px", padding: "6px 0", cursor: "pointer" }}
         >
-          もう一度アンケートに答える
+          {t.again}
         </button>
       </div>
       <div className="pk-safe-bottom" style={{ padding: "10px 20px 20px" }}>
@@ -637,7 +758,7 @@ function ResultScreen({ reviews, setReviews, onRestart }) {
           rel="noopener noreferrer"
           style={{ textDecoration: "none" }}
         >
-          <button className="pk-btn pk-btn-maps">Googleマップで口コミを書く</button>
+          <button className="pk-btn pk-btn-maps">{t.maps}</button>
         </a>
       </div>
     </div>
@@ -653,11 +774,31 @@ function PanipaniReviewApp() {
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useAnswers();
   const [reviews, setReviews] = useState({ natural: "", polite: "", friendly: "" });
+  const [lang, setLang] = useState(() => {
+    try {
+      const saved = localStorage.getItem("panipani-lang");
+      if (saved === "ja" || saved === "en") return saved;
+    } catch (e) {}
+    return "ja";
+  });
+
+  const toggleLang = () => {
+    const next = lang === "ja" ? "en" : "ja";
+    setLang(next);
+    document.documentElement.lang = next;
+    document.title = next === "en" ? "panipani Review Maker" : "panipani 口コミ作成";
+    try { localStorage.setItem("panipani-lang", next); } catch (e) {}
+  };
+
+  React.useEffect(() => {
+    document.documentElement.lang = lang;
+    document.title = lang === "en" ? "panipani Review Maker" : "panipani 口コミ作成";
+  }, []);
 
   const runGeneration = async () => {
     setScreen("generating");
     try {
-      const result = await generateReviewsFromAnswers(answers);
+      const result = await generateReviewsFromAnswers(answers, lang);
       setReviews(result);
       setScreen("result");
     } catch (e) {
@@ -671,9 +812,29 @@ function PanipaniReviewApp() {
   };
 
   return (
+    <LangContext.Provider value={lang}>
     <div className="pk-root">
       <GlobalStyle />
       <div style={{ maxWidth: "480px", margin: "0 auto", width: "100%", flex: 1, display: "flex", flexDirection: "column" }}>
+        <div className="pk-safe-top" style={{ display: "flex", justifyContent: "flex-end", padding: "10px 16px 0" }}>
+          <button
+            type="button"
+            onClick={toggleLang}
+            style={{
+              border: "1.5px solid #C9D0BE",
+              background: "#FFFFFF",
+              color: "#54614A",
+              borderRadius: "999px",
+              padding: "6px 14px",
+              fontSize: "13px",
+              fontWeight: 700,
+              fontFamily: "'Zen Kaku Gothic New', sans-serif",
+              cursor: "pointer",
+            }}
+          >
+            {UI[lang].langButton}
+          </button>
+        </div>
         {screen === "top" && <TopScreen onStart={() => setScreen("survey")} />}
         {screen === "survey" && (
           <SurveyScreen
@@ -692,6 +853,7 @@ function PanipaniReviewApp() {
         )}
       </div>
     </div>
+    </LangContext.Provider>
   );
 }
 
